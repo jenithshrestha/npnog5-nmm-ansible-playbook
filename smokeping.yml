@@ -37,6 +37,7 @@
       with_items:
         - General
         - Alerts
+        - Probes
       tags: base_config
       notify: restart smokeping
 

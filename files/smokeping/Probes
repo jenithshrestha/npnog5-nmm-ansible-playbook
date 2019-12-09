@@ -1,0 +1,15 @@
+*** Probes ***
+
++ FPing
+
+binary = /usr/bin/fping
+
++ EchoPingHttp
+
++ EchoPingHttps
+
++ DNS
+binary = /usr/bin/dig
+pings = 5
+step = 180
+lookup = www.workalaya.net

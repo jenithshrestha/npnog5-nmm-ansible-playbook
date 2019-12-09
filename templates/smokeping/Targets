@@ -17,6 +17,7 @@ title = Local Network
 menu = Local Machine
 title = This host
 host = localhost
+alerts = someloss
 
 #
 # ********* Classroom Servers **********
@@ -91,3 +92,120 @@ title = Core Router
 menu = Group{{class_group}}
 title = Core Router Group {{class_group}}
 host = rtr1-g{{class_group}}.lab.workalaya.net
+
+#
+# Local Web server response
+#
+
++HTTP
+
+menu = Local HTTP Response
+title = HTTP Response of VMs
+
+{% for host in range(1,4) %}
+++vm{{host}}
+
+menu = vm{{host}}
+title = vm{{host}}-g{{class_group}} HTTP response time
+probe = EchoPingHttp
+host = vm{{host}}-g{{class_group}}.lab.workalaya.net
+
+{% endfor %}
+
+
+
+
+#
+# Remote Web server response
+#
+
++HTTPSRemote
+
+menu = Remote HTTPS Response
+title = HTTPS Response Remote Machines
+
+++google
+
+menu = Google
+title = Google.com HTTPS response time
+probe = EchoPingHttps
+host = www.google.org
+
+++workalaya
+
+menu = Workalaya R and D
+title = workalaya.net HTTPS response time
+probe = EchoPingHttps
+host = workalaya.net
+
+++facebook
+
+menu = Facebook
+title = Facebook HTTPS response time
+probe = EchoPingHttps
+host = www.facebook.com
+
+
+
+
+#
+# Sample DNS probe
+#
+
++DNS
+
+probe = DNS
+menu = DNS Latency
+title = DNS Latency Probes
+
+++LocalDNS1
+menu = ns1.lab.workalaya.net
+title =  DNS Delay for local DNS Server on ns1.lab.workalaya.net
+host = ns1.lab.workalaya.net
+
+++Quad9
+menu = 9.9.9.9
+title = DNS Latency for dns.quad9.net
+host = dns.quad9.net
+
+++CloudflareDNS
+menu = 1.1.1.1
+title = DNS Latency for one.one.one.one
+host = one.one.one.one
+
+++GoogleA
+menu = 8.8.8.8
+title = DNS Latency for google-public-dns-a.google.com
+host = google-public-dns-a.google.com
+
+++GoogleB
+
+menu = 8.8.4.4
+title = DNS Latency for google-public-dns-b.google.com
+host = google-public-dns-b.google.com
+
+++OpenDNSA
+
+menu = 208.67.222.222
+title = DNS Latency for resolver1.opendns.com
+host = resolver1.opendns.com
+
+++OpenDNSB
+
+menu = 208.67.220.220
+title = DNS Latency for resolver2.opendns.com
+host = resolver2.opendns.com
+
+
+
+#
+# Multihost Graph of all DNS latency checks
+#
+
+++MultiHostDNS
+
+menu = MultiHost DNS
+title = Consolidated DNS Responses
+host = /DNS/LocalDNS1 /DNS/Quad9 /DNS/CloudflareDNS /DNS/GoogleA /DNS/GoogleB /DNS/OpenDNSA /DNS/OpenDNSB
+
+

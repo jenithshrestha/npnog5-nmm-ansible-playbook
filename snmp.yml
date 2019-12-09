@@ -1,0 +1,101 @@
+- hosts: snmp_hosts
+  become: true
+  tasks:
+    - name: ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: snmp_client, snmpd_server
+
+    - name: install snmp tools
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - snmp
+        - snmp-mibs-downloader
+      tags: snmp_client
+
+    - name: Update /etc/snmp/snmp.conf
+      lineinfile:
+        dest: "/etc/snmp/snmp.conf"
+        regexp: "^mibs :"
+        line: "#mibs :"
+      tags: snmp_client
+
+    - name: Create .snmp directory in /home/lab/
+      file:
+        path: "/home/lab/.snmp"
+        state: directory
+        mode: 0700
+      become: false
+      tags: snmp_client
+
+    - name: Create .snmp/snmp.conf
+      copy:
+        src: files/snmp/snmp.conf
+        dest: /home/lab/.snmp/snmp.conf
+        mode: 0600
+      become: false
+      tags: snmp_client
+
+    - name: install snmpd tools
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - snmpd
+        - libsnmp-dev
+      tags: snmpd_server
+
+    - name: Update /etc/snmp/snmpd.conf
+      template:
+        src: templates/snmpd/snmpd.conf
+        dest: "/etc/snmp/snmpd.conf"
+      notify: restart snmpd
+      tags: snmpd_server
+
+    - name: Create /var/lib/snmp/mibs/cisco
+      file:
+        path: "/var/lib/snmp/mibs/cisco"
+        state: directory
+        mode: 0700
+      tags: mibs
+
+    - name: check if mibs exists
+      stat:
+        path: '/var/lib/snmp/mibs/cisco/{{ item }}'
+      register: mib_files
+      with_items:
+      - CISCO-SMI.my
+      - CISCO-ENVMON-MIB.my
+      tags: mibs
+
+    - name: Check if mib files exist
+      set_fact:
+        mib_file_stat: "{{ mib_file_stat|default({}) | combine({item.item: item.stat.exists}) }}"
+      with_items: '{{ mib_files.results }}'
+      tags: mibs
+
+    - name: Download mibs
+      get_url:
+        url: http://www.lab.workalaya.net/downloads/mibs/{{ item }}
+        dest: /var/lib/snmp/mibs/cisco/{{ item }}
+      when: not mib_file_stat[item]
+      with_items:
+        - CISCO-SMI.my
+        - CISCO-ENVMON-MIB.my
+      tags: mibs
+
+    - name: update /etc/snmp/snmp.conf file
+      lineinfile:
+        dest: "/etc/snmp/snmp.conf"
+        line: "{{item}}"
+      with_items:
+        - "mibdirs +/var/lib/snmp/mibs/cisco"
+        - "mibs +CISCO-ENVMON-MIB:CISCO-SMI"
+      tags: mibs
+
+  handlers:
+    - name: restart snmpd
+      service:
+        name: snmpd
+        state: restarted
