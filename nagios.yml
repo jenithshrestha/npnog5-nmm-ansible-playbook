@@ -1,0 +1,102 @@
+- hosts: nagios_hosts
+  become: true
+  tasks:
+    - name: ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: install
+
+    - name: install Nagios Version 3
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - nagios3
+        - nagios3-doc
+      tags: install
+
+    - name: Check nagios Users
+      stat:
+        path: /etc/nagios3/htpasswd.users
+      ignore_errors: true
+      register: nagios_user_pwfile_exists
+      tags: configure
+
+    - name: Create empty password file
+      command: touch /etc/nagios3/htpasswd.users
+      args:
+        creates: /etc/nagios3/htpasswd.users
+      when: not nagios_user_pwfile_exists
+      tags: configure
+
+    - name: Create nagios admin user
+      htpasswd:
+        path: /etc/nagios3/htpasswd.users
+        name: nagiosadmin
+        password: "{{ class_password }}"
+        state: present
+      ignore_errors: true
+      tags: configure
+
+    - name: Create nagios guest user
+      htpasswd:
+        path: /etc/nagios3/htpasswd.users
+        name: "{{ item.username }}"
+        password: "{{ item.password }}"
+        state: present
+      ignore_errors: true
+      with_items:
+        - { username: 'guest', password: 'guest' }
+      tags: add_guest
+
+    - name: Configure nagios.cgi to allow guest access
+      lineinfile:
+        dest: "/etc/nagios3/cgi.cfg"
+        regexp: "^{{ item.property | regex_escape() }}="
+        line: "{{ item.property }}={{ item.value }}"
+      with_items:
+        - { property: 'authorized_for_system_information', value: 'nagiosadmin,guest' }
+        - { property: 'authorized_for_configuration_information', value: 'nagiosadmin,guest' }
+        - { property: 'authorized_for_all_services', value: 'nagiosadmin,guest' }
+        - { property: 'authorized_for_all_hosts', value: 'nagiosadmin,guest' }
+      tags: add_guest
+      notify: verify config
+
+    - name: Update nagios.cfg to Enable External commands
+      lineinfile:
+        dest: "/etc/nagios3/nagios.cfg"
+        regexp: "^{{ item.property | regex_escape() }}="
+        line: "{{ item.property }}={{ item.value }}"
+      with_items:
+        - { property: 'check_external_commands', value: '1' }
+      register: update_directory_permission
+      tags: external_command
+      notify: verify config
+
+    - name: change directory permissions
+      shell: "dpkg-statoverride --update --add {{ item.user }} {{ item.group }} {{ item.permission }} {{ item.dir }}"
+      with_items:
+        - { user: 'nagios', group: 'www-data', permission: '2710', dir: '/var/lib/nagios3/rw' }
+        - { user: 'nagios', group: 'nagios', permission: '751', dir: '/var/lib/nagios3' }
+      when: update_directory_permission.changed
+      tags: external_command
+      notify: restart nagios3
+
+    - name: Generate the nagios monitoring templates
+      template:
+        src: ./templates/nagios/{{ item }}
+        dest: /etc/nagios3/conf.d
+        backup: yes
+      with_items:
+        - routers.cfg
+        - vms.cfg
+        - servicegroups.cfg
+      tags: update_config
+      notify: verify config
+
+  handlers:
+    - name: verify config
+      shell: nagios3 -v /etc/nagios3/nagios.cfg
+      notify: restart nagios3
+
+    - name: restart nagios3
+      service: name=nagios3 state=restarted
