@@ -7,5 +7,5 @@ vm4-g6.lab.workalaya.net
 [smokeping_hosts]
 vm4-g6.lab.workalaya.net
 
-[snmp_hosts]
+[netdot_hosts]
 vm4-g6.lab.workalaya.net
