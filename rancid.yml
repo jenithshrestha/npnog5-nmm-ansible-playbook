@@ -1,0 +1,28 @@
+- hosts: rancid_hosts
+  become: true
+  tasks:
+    - name: ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: install
+
+    - name: Set RANCID options
+      debconf:
+        name: "{{ item.name }}"
+        question: "{{ item.question }}"
+        value: "{{ item.value }}"
+        vtype: "string"
+      with_items:
+        - { name: "rancid", question: "rancid/warning", value: "" }
+        - { name: "rancid", question: "rancid/go_on", value: "true" }
+      tags: install
+
+    - name: install rancid and dependencies
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - subversion
+        - telnet
+        - mutt
+        - rancid
+      tags: install
