@@ -1,0 +1,73 @@
+- hosts: rancid_hosts
+  become: true
+  tasks:
+    - name: ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: install
+
+    - name: install ViewVC and dependencies
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - viewvc
+        - apache2
+      tags: install
+
+    - name: update /etc/viewvc/viewvc.conf for svn root
+      lineinfile:
+        path: /etc/viewvc/viewvc.conf
+        regexp: '^svn_roots'
+        insertafter: '#svn_roots'
+        line: "svn_roots = rancid: /var/lib/rancid/svn"
+      tags: config
+
+    - name: add www-data into rancid group
+      user:
+        name: www-data
+        groups: rancid
+        append: yes
+      tags: apache_config
+
+    - name: copy ViewVC apache config
+      copy:
+        src: files/apache2/viewvc.conf
+        dest: /etc/apache2/conf-available/
+      tags: apache_config, secure_viewvc
+      notify: restart apache2
+
+    - name: enable ViewVC with apache
+      command: a2enconf viewvc.conf
+      args:
+        creates: /etc/apache2/conf-enabled/viewvc.conf
+      notify: restart apache2
+      tags: apache_config
+
+    - name: check viewvc .htpasswd file
+      stat:
+        path: /etc/viewvc/.htpasswd
+      ignore_errors: true
+      register: viewvc_pwfile_exists
+      tags: secure_viewvc
+
+    - name: Create empty password file
+      command: touch /etc/viewvc/.htpasswd
+      args:
+        creates: /etc/viewvc/.htpasswd
+      when: not viewvc_pwfile_exists
+      tags: secure_viewvc
+
+    - name: Create lab user on .htpasswd
+      htpasswd:
+        path: /etc/viewvc/.htpasswd
+        name: lab
+        password: "{{ class_password }}"
+        state: present
+      ignore_errors: true
+      tags: secure_viewvc
+
+  handlers:
+    - name: restart apache2
+      service:
+        name: apache2
+        state: restarted

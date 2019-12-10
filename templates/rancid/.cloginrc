@@ -1,0 +1,4 @@
+add method * {ssh}
+add user *.lab.workalaya.net lab
+add password *.lab.workalaya.net {{ class_password }} {{ class_en_password }}
+add cyphertype *.lab.workalaya.net {aes256-cbc}
