@@ -1,0 +1,31 @@
+- hosts: cacti_hosts
+  become: true
+  tasks:
+    - name: ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: install
+      ignore_errors: true
+
+    - name: Set cacti install options
+      debconf:
+        name: "{{ item.name }}"
+        question: "{{ item.question }}"
+        value: "{{ item.value }}"
+        vtype: "{{ item.vtype }}"
+      with_items:
+        - { name: "cacti", question: "cacti/webserver", value: "apache2", vtype: "select" }
+        - { name: "cacti", question: "cacti/database-type", value: "mysql", vtype: "select" }
+        - { name: "cacti", question: "cacti/app-password-confirm", value: "{{ class_password }}", vtype: 'password'}
+        - { name: "cacti", question: "cacti/mysql/admin-pass", value: "cacti", vtype: 'password'}
+        - { name: "cacti", question: "cacti/mysql/app-pass", value: "{{ class_password }}", vtype: 'password'}
+      ignore_errors: true
+      tags: install
+
+    - name: install cacti and its dependency
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - cacti
+        - cacti-spine
+      tags: install
