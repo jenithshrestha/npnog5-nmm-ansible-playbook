@@ -3,8 +3,7 @@
   vars:
     nfsen_sources:
       - "'rtr-g{{ class_group }}' => {'port'=>'9996','col'=>'#0000ff','type'=>'netflow'},"
-    nfsen_bufflen:
-      - 20000
+    nfsen_bufflen: 20000
   tasks:
     - name: ensure package cache is up to date
       apt:

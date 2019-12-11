@@ -1,0 +1,8 @@
+set logfile /var/log/remote-syslog/consolidated.log
+set queue network_alarms tenshi@localhost lab@localhost [*/1 * * * *] Log check
+
+group_host ^100\.68\.
+network_alarms SYS-5-CONFIG_I
+network_alarms PRIV_AUTH_PASS
+network_alarms LINK
+group_end

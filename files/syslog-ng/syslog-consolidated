@@ -1,0 +1,8 @@
+/var/log/remote-syslog/consolidated.log {
+  daily
+  copytruncate
+  rotate 1
+  postrotate
+    /etc/init.d/tenshi restart
+  endscript
+}
