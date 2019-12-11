@@ -1,0 +1,118 @@
+- hosts: nfsen_hosts
+  become: true
+  vars:
+    nfsen_sources:
+      - "'rtr-g{{ class_group }}' => {'port'=>'9996','col'=>'#0000ff','type'=>'netflow'},"
+    nfsen_bufflen:
+      - 20000
+  tasks:
+    - name: ensure package cache is up to date
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      tags: install-nfdump, build-nfsen
+
+    - name: install nfdump and dependency packages
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - nfdump
+        - rrdtool
+        - librrds-perl
+        - librrdp-perl
+        - libmailtools-perl
+        - libsocket6-perl
+        - php
+      tags: install-nfdump
+
+    - name: stop nfdump
+      service:
+        name: nfdump
+        state: stopped
+      tags: install-nfdump
+
+    - name: disable nfdump
+      service:
+        name: nfdump
+        enabled: no
+      tags: install-nfdump
+
+    - name: check for nfsen install directory
+      stat:
+        path: /var/nfsen
+      register: nfsen_check
+      tags: build-nfsen
+
+    - name: nfsen
+      block:
+        - name: download nfsen source
+          get_url:
+            # url: 'https://sourceforge.net/projects/nfsen/files/stable/nfsen-1.3.8/nfsen-1.3.8.tar.gz/download'
+            url: 'http://www.lab.workalaya.net/downloads/nfsen/nfsen-1.3.8.tar.gz'
+            dest: /usr/local/src
+          retries: 5
+          delay: 10
+
+        - name: cleanup nfsen source directory
+          file:
+            path: /usr/local/src/nfsen-1.3.8
+            state: absent
+
+        - name: extract nfsen source
+          unarchive:
+            src: /usr/local/src/nfsen-1.3.8.tar.gz
+            dest: /usr/local/src
+            remote_src: yes
+
+        - name: download nfsen patch
+          get_url:
+            # url: 'http://npnog5.chatur.com.np/nmm/netflow/nfsen.patch'
+            url: 'http://www.lab.workalaya.net/downloads/nfsen/nfsen.patch'
+            dest: /usr/local/src/nfsen-1.3.8
+          retries: 5
+          delay: 10
+
+        - name: apply patches to nfsen source
+          shell: patch -p0 < {{item}}
+          args:
+            chdir: '/usr/local/src/nfsen-1.3.8'
+          with_items:
+            - nfsen.patch
+          ignore_errors: true
+
+        - name: create nfsen.conf
+          template:
+            src: templates/nfsen/nfsen.conf
+            dest: /usr/local/src/nfsen-1.3.8/etc/nfsen.conf
+
+        - name: create nfsen user
+          user:
+            name: netflow
+            home: /var/nfsen
+            groups: www-data
+            append: yes
+            shell: /bin/false
+
+        - name: run nfsen installer
+          shell: perl install.pl ./etc/nfsen.conf </dev/null
+          args:
+            chdir: '/usr/local/src/nfsen-1.3.8'
+
+        - name: install nfsen.service systemd
+          copy:
+            src: files/nfsen/nfsen.service
+            dest: /etc/systemd/system/
+
+        - name: enable nfsen
+          service:
+            name: nfsen
+            enabled: yes
+
+        - name: start nfsen
+          service:
+            name: nfsen
+            state: started
+
+      when: nfsen_check.stat.isdir is not defined or nfsen_check.stat.isdir == false
+      tags: build-nfsen
