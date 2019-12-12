@@ -21,3 +21,6 @@ srv1-g6.lab.workalaya.net
 
 [cacti_hosts]
 vm4-g6.lab.workalaya.net
+
+[tick_stack_hosts]
+vm4-g6.lab.workalaya.net

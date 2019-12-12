@@ -1,0 +1,72 @@
+- hosts: tick_stack_hosts
+  become: true
+  tasks:
+    - name: Download Influxdb Repo apt key for Ubuntu
+      apt_key:
+        url: "https://repos.influxdata.com/influxdb.key"
+        state: present
+      tags: install
+
+    - name: Add Influxdb Repo (Ubuntu 18)
+      apt_repository:
+        repo: "deb http://repos.influxdata.com/ubuntu bionic stable"
+        filename: "influxdb-repo"
+        state: present
+      tags: install
+
+    - name: Ensure package cache is up to date
+      apt: update_cache=yes cache_valid_time=3600
+      tags: install
+
+    - name: Install TICK stack
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - telegraf
+        - influxdb
+        - chronograf
+        - kapacitor
+      tags: install
+
+    - name: Ensure tick stack is running and enabled at boot
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: false
+      with_items:
+        - telegraf
+        - influxdb
+        - chronograf
+        - kapacitor
+      tags: install
+
+    - name: Configure Kapacitor SMTP
+      lineinfile:
+        path: /etc/kapacitor/kapacitor.conf
+        regexp: '^  no-verify = false'
+        line: '  no-verify = true'
+      notify: restart kapacitor
+      tags: config
+
+    - name: Add other datasource to telegraf
+      copy:
+        src: 'files/telegraf/{{ item }}'
+        dest: '/etc/telegraf/telegraf.d/'
+      with_items:
+        - network.conf
+        - ping.conf
+        - snmp.conf
+      notify: restart telegraf
+      tags: config
+
+  handlers:
+    - name: restart telegraf
+      service:
+        name: telegraf
+        state: restarted
+
+    - name: restart kapacitor
+      service:
+        name: kapacitor
+        state: restarted
